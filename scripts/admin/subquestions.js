@@ -563,7 +563,13 @@ function quickaddlabels()
             thisrow=lsrows[k].splitCSV(separatorchar);
             if (thisrow.length<=languages.length)
                 {
-                thisrow.unshift(parseInt(k)+1);
+                //make an effort to avoid duplicates
+                var curMax = parseInt($('input.code:last').val());
+                if(isNaN(curMax))
+                    {
+                    curMax = 0;
+                }
+                thisrow.unshift(parseInt(k) + curMax + 1);
             }
             else
                 {
