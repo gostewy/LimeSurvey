@@ -1282,16 +1282,17 @@ function upgradeSurveys177()
 {
     $sSurveyQuery = "SELECT surveyls_attributecaptions,surveyls_survey_id,surveyls_language FROM {{surveys_languagesettings}}";
     $oSurveyResult = Yii::app()->db->createCommand($sSurveyQuery)->queryAll();
-    $sSurveyLSUpdateQuery= "update {{surveys_languagesettings}} set surveyls_attributecaptions=:attributecaptions where surveyls_survey_id=".$aSurveyRow['surveyls_survey_id'].' and surveyls_language=:language';
+    //$sSurveyLSUpdateQuery= "update {{surveys_languagesettings}} set surveyls_attributecaptions=:attributecaptions where surveyls_survey_id=".$aSurveyRow['surveyls_survey_id'].' and surveyls_language=:language';
+    $sSurveyLSUpdateQuery= "update {{surveys_languagesettings}} set surveyls_attributecaptions=:attributecaptions where surveyls_survey_id=:surveyid and surveyls_language=:language";
     foreach ( $oSurveyResult as $aSurveyRow )
     {
         $aAttributeDescriptions=@unserialize($aSurveyRow['surveyls_attributecaptions']);
         if (!$aAttributeDescriptions) $aAttributeDescriptions=array();
-        Yii::app()->db->createCommand($sSurveyLSUpdateQuery)->execute(array(':language'=>$aSurveyRow['surveyls_language'],':attributecaptions'=>json_encode($aAttributeDescriptions)));
+        Yii::app()->db->createCommand($sSurveyLSUpdateQuery)->execute(array(':surveyid'=>$aSurveyRow['surveyls_survey_id'],':language'=>$aSurveyRow['surveyls_language'],':attributecaptions'=>json_encode($aAttributeDescriptions)));
     }
     $sSurveyQuery = "SELECT sid FROM {{surveys}}";
     $oSurveyResult = Yii::app()->db->createCommand($sSurveyQuery)->queryAll();
-    $sSurveyUpdateQuery= "update {{surveys}} set attributedescriptions=:attributedescriptions where sid=".$aSurveyRow['sid'];
+    $sSurveyUpdateQuery= "update {{surveys}} set attributedescriptions=:attributedescriptions where sid=".$aSurveyRow['surveyls_survey_id'];
     foreach ( $oSurveyResult as $aSurveyRow )
     {
         $aAttributeDescriptions=@unserialize($aSurveyRow['attributedescriptions']);
