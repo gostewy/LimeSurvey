@@ -11,7 +11,6 @@ if ( !defined('BASEPATH')) exit('No direct script access allowed');
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 *
-*	$Id$
 */
 
 /**
@@ -209,7 +208,7 @@ function createTable($sTableName, $aColumns, $sOptions=null)
             $sType=str_replace('text','varchar(max)',$sType);
             $sType=str_replace('binary','text',$sType);
             if ($sType=='pk') $sType.=' NOT NULL';
-            if (stripos($sType,'null')===false) $sType.=' NULL';
+            if (stripos($sType,'null')===false && stripos($sType,'PRIMARY KEY')===false) $sType.=' NULL';
         }
     }
     if ($sDBDriverName=='pgsql')
@@ -222,7 +221,7 @@ function createTable($sTableName, $aColumns, $sOptions=null)
     if (Yii::app()->db->driverName == 'mysql' || Yii::app()->db->driverName == 'mysqli')
     {
         if (is_null($sOptions))
-        $sOptions='ENGINE=MyISAM';
+        $sOptions='ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci';
     }
     Yii::app()->db->createCommand()->createTable($sTableName,$aColumns,$sOptions);
 }

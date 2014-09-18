@@ -11,7 +11,8 @@ $(document).ready(function() {
     // Set some custom messages
     $.jgrid.edit.msg.required = sRequired;
 
-    jQuery("#attributeControl").jqGrid({
+    $("#attributeControl").jqGrid({
+        direction: $('html').attr('dir'),
         loadtext : sLoadText,
         align:"center",
         url: attributeInfoUrl,
@@ -33,11 +34,23 @@ $(document).ready(function() {
         pager: "#pager",
         pgtext: pagerMsg,
         emptyrecords: emptyRecordsTxt,
+		gridComplete: function() {
+			// Disable "Add" button if more than 59 attributes
+			if($('#attributeControl').jqGrid('getGridParam', 'records') > 59) {
+				var newCell = $('#add_attributeControl').clone();
+				$('#add_attributeControl').hide().before(newCell);
+				$('#add_attributeControl:eq(0)').attr('id', 'add_attributeControl_new').attr('title', addDisabledCaption);
+				$('#add_attributeControl_new .ui-icon').addClass('ui-state-disabled');
+			}
+			else {
+				$('#add_attributeControl').show();
+				$('#add_attributeControl_new').remove();
+			}
+		},
         recordtext: viewRecordTxt
     });
 
-    jQuery.extend($.fn.fmatter , {
-        rowactions : function(rid,gid,act, pos) {
+    $.extend($.fn.fmatter.rowactions = function(act) {
             var delOptions = {
                 bCancel: sCancel,
                 bSubmit: sDeleteButtonCaption,                
@@ -46,6 +59,9 @@ $(document).ready(function() {
                 reloadAfterSubmit: true,
                 width: 400
             };
+            var $tr = $(this).closest("tr.jqgrow");
+            rid = $tr.attr("id");
+            gid = $(this).closest("table.ui-jqgrid-btable").attr('id').replace(/_frozen([^_]*)$/,'$1');
             switch(act)
             {
                 case 'edit' :
@@ -56,9 +72,9 @@ $(document).ready(function() {
                     break;
             }
         }
-    });
+    );
 
-    jQuery('#attributeControl').jqGrid('navGrid', '#pager',
+    $('#attributeControl').jqGrid('navGrid', '#pager',
         { add:true,
             edit:false,
             del:true,
@@ -68,11 +84,9 @@ $(document).ready(function() {
             deltitle: deleteCaption,
             edittitle: sEditAttributeMsg,
             searchtitle: searchMsg,
-            msg: {required: sRequired},
             refreshtitle: refreshMsg},
         {
             edittitle: sEditAttributeMsg,
-            msg: {required: sRequired}
         }, //Default settings for edit
         { addCaption: addCaption,
             bCancel: sCancel,

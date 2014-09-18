@@ -10,7 +10,6 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 *
-*	$Id$
 */
 
 /**
@@ -27,9 +26,10 @@ function fixNumbering($fixnumbering, $iSurveyID)
     LimeExpressionManager::RevertUpgradeConditionsToRelevance($iSurveyID);
     //Fix a question id - requires renumbering a question
     $oldqid = (int) $fixnumbering;
-    $lastqid=Questions::model()->getMaxId();
+    $lastqid=Question::model()->getMaxId('qid', true); // Always refresh as we insert new qid's
     $newqid=$lastqid+1;
 
+    // Not sure we can do this in MSSQL ?
     $query = "UPDATE {{questions}} SET qid=$newqid WHERE qid=$oldqid";
     $result = db_execute_assosc($query);
     // Update subquestions
@@ -56,7 +56,7 @@ function fixNumbering($fixnumbering, $iSurveyID)
             $result = db_execute_assosc($query);
         }
     }
-    // TMSW Conditions->Relevance:  (1) Call LEM->ConvertConditionsToRelevance()when done. (2) Should relevance for old conditions be removed first?
+    // TMSW Condition->Relevance:  (1) Call LEM->ConvertConditionsToRelevance()when done. (2) Should relevance for old conditions be removed first?
     //Now question_attributes
     $query = "UPDATE {{question_attributes}} SET qid=$newqid WHERE qid=$oldqid";
     $result = db_execute_assosc($query);
@@ -284,7 +284,8 @@ function activateSurvey($iSurveyID, $simulate = false)
             case "lastpage":
                 $createsurvey[$arow['fieldname']] = "integer";
                 break;
-            case "N":  //NUMERICAL
+            case "N":  //Numerical
+            case "K":  //Multiple Numerical
                 $createsurvey[$arow['fieldname']] = "decimal (30,10)";
                 break;
             case "S":  //SHORT TEXT
@@ -304,9 +305,6 @@ function activateSurvey($iSurveyID, $simulate = false)
                 {
                     $createsurvey[$arow['fieldname']] = "text";
                 }
-                break;
-            case "K":  // Multiple Numerical
-                $createsurvey[$arow['fieldname']] = "float";
                 break;
             case "U":  //Huge text
             case "Q":  //Multiple short text
@@ -381,6 +379,7 @@ function activateSurvey($iSurveyID, $simulate = false)
     try
     {
         $execresult = createTable($tabname, $createsurvey);
+        Yii::app()->db->schema->getTable($tabname, true); // Refresh schema cache just in case the table existed in the past
     }
     catch (CDbException $e)
     {
@@ -395,31 +394,27 @@ function activateSurvey($iSurveyID, $simulate = false)
     }
     
     $anquery = "SELECT autonumber_start FROM {{surveys}} WHERE sid={$iSurveyID}";
-    if ($anresult=Yii::app()->db->createCommand($anquery)->query()->readAll())
-    {
-        //if there is an autonumber_start field, start auto numbering here
-        foreach($anresult as $row)
+    $iAutoNumberStart=Yii::app()->db->createCommand($anquery)->queryScalar();
+    //if there is an autonumber_start field, start auto numbering here
+    if ($iAutoNumberStart!==false && $iAutoNumberStart>0)
+    {                                                                   
+        if (Yii::app()->db->driverName=='mssql' || Yii::app()->db->driverName=='sqlsrv' || Yii::app()->db->driverName=='dblib') {
+            mssql_drop_primary_index('survey_'.$iSurveyID);
+            mssql_drop_constraint('id','survey_'.$iSurveyID);
+            $sQuery = "alter table {{survey_{$iSurveyID}}} drop column id ";
+            Yii::app()->db->createCommand($sQuery)->execute();
+            $sQuery = "alter table {{survey_{$iSurveyID}}} add [id] int identity({$iAutoNumberStart},1)";
+            Yii::app()->db->createCommand($sQuery)->execute();
+        }
+        elseif (Yii::app()->db->driverName=='pgsql')
         {
-            if ($row['autonumber_start'] > 0)
-            {
-                if (Yii::app()->db->driverName=='mssql' || Yii::app()->db->driverName=='sqlsrv' || Yii::app()->db->driverName=='dblib') {
-                    mssql_drop_primary_index('survey_'.$iSurveyID);
-                    mssql_drop_constraint('id','survey_'.$iSurveyID);
-                    $autonumberquery = "alter table {{survey_{$iSurveyID}}} drop column id ";
-                    Yii::app()->db->createCommand($autonumberquery)->execute();
-                    $autonumberquery = "alter table {{survey_{$iSurveyID}}} add [id] int identity({$row['autonumber_start']},1)";
-                    Yii::app()->db->createCommand($autonumberquery)->execute();
-                }
-                elseif (Yii::app()->db->driverName=='pgsql')
-                {
-                    
-                }
-                else
-                {
-                    $autonumberquery = "ALTER TABLE {{survey_{$iSurveyID}}} AUTO_INCREMENT = ".$row['autonumber_start'];
-                    $result = @Yii::app()->db->createCommand($autonumberquery)->execute();
-                }
-            }
+            $sQuery = "SELECT setval(pg_get_serial_sequence('{{survey_{$iSurveyID}}}', 'id'),{$iAutoNumberStart},false);";
+            $result = @Yii::app()->db->createCommand($sQuery)->execute();
+        }
+        else
+        {
+            $sQuery = "ALTER TABLE {{survey_{$iSurveyID}}} AUTO_INCREMENT = {$iAutoNumberStart}";
+            $result = @Yii::app()->db->createCommand($sQuery)->execute();
         }
     }
 
@@ -434,10 +429,11 @@ function activateSurvey($iSurveyID, $simulate = false)
             $column[$field] = 'FLOAT';
         }
 
-        $tabname = "{{survey_{$iSurveyID}}}_timings";
+        $tabname = "{{survey_{$iSurveyID}_timings}}";
         try
         {
             $execresult = createTable($tabname,$column);
+            Yii::app()->db->schema->getTable($tabname, true); // Refresh schema cache just in case the table existed in the past
         }
         catch (CDbException $e)
         {

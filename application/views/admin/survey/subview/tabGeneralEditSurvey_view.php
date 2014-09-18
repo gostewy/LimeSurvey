@@ -1,6 +1,12 @@
 <?php
     $yii = Yii::app();
     $controller = $yii->getController();
+    $sConfirmLanguage="$(document).on('submit','#addnewsurvey',function(){\n"
+                    . "  if(!UpdateLanguageIDs(mylangs,'".gT("All questions, answers, etc for removed languages will be lost. Are you sure?", "js")."')){\n"
+                    . "    return false;\n"
+                    . "  }\n"
+                    . "});\n";
+    Yii::app()->getClientScript()->registerScript('confirmLanguage',$sConfirmLanguage,CClientScript::POS_BEGIN);
 ?>
 <div id='general'>
     <ul>
@@ -46,13 +52,13 @@
 
 
         <li><label for='admin'><?php $clang->eT("Administrator:"); ?></label>
-            <input type='text' size='50' id='admin' name='admin' value="<?php echo $esrow['admin']; ?>" /></li>
+            <input type='text' size='50' id='admin' name='admin' value="<?php echo htmlspecialchars($esrow['admin']); ?>" /></li>
         <li><label for='adminemail'><?php $clang->eT("Admin email:"); ?></label>
-            <input type='email' size='50' id='adminemail' name='adminemail' value="<?php echo $esrow['adminemail']; ?>" /></li>
+            <input type='email' size='50' id='adminemail' name='adminemail' value="<?php echo htmlspecialchars($esrow['adminemail']); ?>" /></li>
         <li><label for='bounce_email'><?php $clang->eT("Bounce email:"); ?></label>
-            <input type='email' size='50' id='bounce_email' name='bounce_email' value="<?php echo $esrow['bounce_email']; ?>" /></li>
+            <input type='email' size='50' id='bounce_email' name='bounce_email' value="<?php echo htmlspecialchars($esrow['bounce_email']); ?>" /></li>
         <li><label for='faxto'><?php $clang->eT("Fax to:"); ?></label>
-            <input type='text' size='50' id='faxto' name='faxto' value="<?php echo $esrow['faxto']; ?>" />
+            <input type='text' size='50' id='faxto' name='faxto' value="<?php echo htmlspecialchars($esrow['faxto']); ?>" />
         </li>
-    </ul>
+ </ul>
 </div>

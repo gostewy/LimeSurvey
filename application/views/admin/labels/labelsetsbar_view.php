@@ -25,9 +25,9 @@
                     {
                         foreach ($labelsets as $lb)
                         { ?>
-                        <option value='<?php echo $this->createUrl("admin/labels/sa/view/lid/".$lb[0]); ?>'
+                        <option data-labelset-id='<?php echo $lb[0]; ?>' value='<?php echo $this->createUrl("admin/labels/sa/view/lid/".$lb[0]); ?>'
                             <?php if ($lb[0] == $lid) { ?> selected='selected' <?php } ?>
-                            ><?php echo $lb[1]; ?></option>
+                            ><?php echo htmlspecialchars($lb[1],ENT_QUOTES); ?></option>
                         <?php }
                 } ?>
 
@@ -40,7 +40,7 @@
             <a href="#" onclick="window.open('<?php echo $this->createUrl("admin/authentication/sa/logout");?>', '_top')">
                 <img src='<?php echo $sImageURL; ?>logout.png' alt='<?php $clang->eT("Logout"); ?>' /></a>
 
-            <a href="#" onclick="showhelp('show')">
+            <a href="http://manual.limesurvey.org" target='_blank'>
                 <img src='<?php echo $sImageURL; ?>showhelp.png' alt='<?php $clang->eT("Show help"); ?>' /></a>
         </div>
     </div>
