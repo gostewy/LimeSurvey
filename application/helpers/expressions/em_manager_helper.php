@@ -4990,7 +4990,11 @@
                     {
                         $result = $LEM->_ValidateGroup($LEM->currentGroupSeq);
                         $message .= $result['message'];
-                        $updatedValues = array_merge($updatedValues,$result['updatedValues']);
+
+                        //fix array_merge(): Argument #2 is not an array when deleting question group?
+                        if(is_array($result['updatedValues'])) {
+                            $updatedValues = array_merge($updatedValues,$result['updatedValues']);
+                        }
                         if (!is_null($result) && ($result['mandViolation'] || !$result['valid']))
                         {
                             // redisplay the current group
