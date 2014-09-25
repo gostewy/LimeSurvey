@@ -758,24 +758,20 @@
             // Cheat and upgrade question attributes here too.
             self::UpgradeQuestionAttributes(true,$surveyId,$qid);
 
-            if (is_null($surveyId))
-            {
-                $sQuery='SELECT sid FROM {{surveys}}';
-                $aSurveyIDs = Yii::app()->db->createCommand($sQuery)->queryColumn();
-            }
-            else{
-                $aSurveyIDs=array($surveyId);
-            }
-            foreach ($aSurveyIDs as $surveyId )     {
-                // echo $surveyId.'<br>';flush();@ob_flush();
-                $releqns = self::ConvertConditionsToRelevance($surveyId,$qid);
-                foreach ($releqns as $key=>$value) {
-                    $sQuery = "UPDATE {{questions}} SET relevance=".Yii::app()->db->quoteValue($value)." WHERE qid=".$key;
-                    Yii::app()->db->createCommand($sQuery)->execute();
-                }
+            $releqns = self::ConvertConditionsToRelevance($surveyId,$qid);
+            $num = count($releqns);
+            if ($num == 0) {
+                return NULL;
             }
 
+            $queries = array();
+            foreach ($releqns as $key=>$value) {
+                $query = "UPDATE {{questions}} SET relevance=".Yii::app()->db->quoteValue($value)." WHERE qid=".$key;
+                dbExecuteAssoc($query);
+                $queries[] = $query;
+            }
             LimeExpressionManager::SetDirtyFlag();
+            return $queries;
         }
 
         /**
@@ -1400,7 +1396,7 @@
                         if ($hasSubqs) {
                             $subqs = $qinfo['subqs'];
                             $sq_equs=array();
-
+                           
                            foreach($subqs as $sq)
                             {
                                 $sq_name = ($this->sgqaNaming)?$sq['rowdivid'].".NAOK":$sq['varName'].".NAOK";
@@ -1479,7 +1475,7 @@
                             break;
                     }
                 }
-
+                
                 // date_min
                 // Maximum date allowed in date question
                 if (isset($qattr['date_min']) && trim($qattr['date_min']) != '')
@@ -1495,13 +1491,13 @@
                             {
                                 case 'D': //DATE QUESTION TYPE
                                     // date_min: Determine whether we have an expression, a full date (YYYY-MM-DD) or only a year(YYYY)
-                                    if (trim($qattr['date_min'])!='')
+                                    if (trim($qattr['date_min'])!='') 
                                     {
                                         $mindate=$qattr['date_min'];
                                         if ((strlen($mindate)==4) && ($mindate>=1900) && ($mindate<=2099))
                                         {
-                                            // backward compatibility: if only a year is given, add month and day
-                                            $date_min='\''.$mindate.'-01-01'.' 00:00\'';
+                                            // backward compatibility: if only a year is given, add month and day 
+                                            $date_min='\''.$mindate.'-01-01'.' 00:00\''; 
                                         }
                                         elseif (preg_match("/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])/",$mindate))
                                         {
@@ -1512,9 +1508,9 @@
                                             $date_min=$date_min.'.NAOK';
                                         }
                                     }
-
+                                  
                                     $sq_name = ($this->sgqaNaming)?$sq['rowdivid'].".NAOK":$sq['varName'].".NAOK";
-
+                                    
                                     if(($qinfo['mandatory']=='Y')){
                                         $sq_name = '('. $sq_name . ' >= ' . $date_min . ')';
                                     }else{
@@ -1569,13 +1565,13 @@
                             {
                                 case 'D': //DATE QUESTION TYPE
                                     // date_max: Determine whether we have an expression, a full date (YYYY-MM-DD) or only a year(YYYY)
-                                    if (trim($qattr['date_max'])!='')
+                                    if (trim($qattr['date_max'])!='') 
                                     {
                                         $maxdate=$qattr['date_max'];
                                         if ((strlen($maxdate)==4) && ($maxdate>=1900) && ($maxdate<=2099))
                                         {
-                                            // backward compatibility: if only a year is given, add month and day
-                                            $date_max='\''.$maxdate.'-12-31 23:59'.'\'';
+                                            // backward compatibility: if only a year is given, add month and day 
+                                            $date_max='\''.$maxdate.'-12-31 23:59'.'\''; 
                                         }
                                         elseif (preg_match("/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])/",$maxdate))
                                         {
@@ -1586,9 +1582,9 @@
                                             $date_max=$date_max.'.NAOK';
                                         }
                                     }
-
+                                  
                                     $sq_name = ($this->sgqaNaming)?$sq['rowdivid'].".NAOK":$sq['varName'].".NAOK";
-
+                                    
                                     if(($qinfo['mandatory']=='Y')){
                                         $sq_name = '(is_empty(' . $date_max . ') || ('. $sq_name . ' <= ' . $date_max . '))';
                                     }else{
@@ -1888,7 +1884,7 @@
                 }else{
                     $input_boxes="";
                 }
-
+                
                 // min_answers
                 // Validation:= count(sq1,...,sqN) >= value (which could be an expression).
                 if (isset($qattr['min_answers']) && trim($qattr['min_answers']) != '' && trim($qattr['min_answers']) != '0')
@@ -2545,7 +2541,7 @@
                             {
                                 case 'K': //MULTI NUMERICAL QUESTION TYPE (Need a attribute, not set in 131014)
                                     $subqValidSelector = $sq['jsVarName_on'];
-                                case 'N': //NUMERICAL QUESTION TYPE
+                                case 'N': //NUMERICAL QUESTION TYPE 
                                     $sq_name = ($this->sgqaNaming)?$sq['rowdivid'].".NAOK":$sq['varName'].".NAOK";
                                     if(($qinfo['mandatory']=='Y')){
                                             $sq_eqn = 'is_int('.$sq_name.')';
@@ -3062,7 +3058,7 @@
 // Helptext is added in qanda_help.php
 /*                  case 'D':
                         $qtips['default']=$this->gT("Please complete all parts of the date.");
-                        break;
+                        break; 
 */
                     default:
                         break;
@@ -3537,9 +3533,17 @@
             );
 
             $this->gseq2info = $this->getGroupInfoForEM($surveyid,$_SESSION['LEMlang']);
+
+            $originfo = $this->getGroupInfoForEM($surveyid,$_SESSION['LEMlang']);
             foreach ($this->gseq2info as $aGroupInfo)
             {
+             //   if(array_key_exists('gid', $aGroupInfo)){
                 $this->groupId2groupSeq[$aGroupInfo['gid']] = $aGroupInfo['group_order'];
+              //  } else {
+                  //  var_dump($aGroupInfo);
+                   // var_dump($originfo);
+                   // exit;
+              //  }
             }
 
             $qattr = $this->getQuestionAttributesForEM($surveyid,0,$_SESSION['LEMlang']);
@@ -4067,21 +4071,21 @@
             if (Survey::model()->hasTokens($surveyid) && isset($_SESSION[$this->sessid]['token']) && $_SESSION[$this->sessid]['token'] != '')
             {
                 //Gather survey data for tokenised surveys, for use in presenting questions
-                $this->knownVars['TOKEN:TOKEN'] = array(
+				$this->knownVars['TOKEN:TOKEN'] = array(
                     'code'=>$_SESSION[$this->sessid]['token'],
                     'jsName_on'=>'',
                     'jsName'=>'',
                     'readWrite'=>'N',
                 );
-
-                $token = Token::model($surveyid)->findByToken($_SESSION[$this->sessid]['token']);
+				
+				$token = Token::model($surveyid)->findByToken($_SESSION[$this->sessid]['token']);
                 foreach ($token as $key => $val)
                 {
                     $this->knownVars["TOKEN:" . strtoupper($key)] = array(
-                        'code' => $anonymized ? '' : $val,
-                        'jsName_on' => '',
-                        'jsName' => '',
-                        'readWrite' => 'N',
+						'code' => $anonymized ? '' : $val,
+						'jsName_on' => '',
+						'jsName' => '',
+						'readWrite' => 'N',
                     );
                 }
             }
@@ -4411,7 +4415,7 @@
                 {
                     $result=true;
                     $relevanceJS=1;
-                }
+                } 
                 else
                 {
                     $relevanceJS = $this->em->GetJavaScriptEquivalentOfExpression();
@@ -4990,11 +4994,7 @@
                     {
                         $result = $LEM->_ValidateGroup($LEM->currentGroupSeq);
                         $message .= $result['message'];
-
-                        //fix array_merge(): Argument #2 is not an array when deleting question group?
-                        if(is_array($result['updatedValues'])) {
-                            $updatedValues = array_merge($updatedValues,$result['updatedValues']);
-                        }
+                        $updatedValues = array_merge($updatedValues,$result['updatedValues']);
                         if (!is_null($result) && ($result['mandViolation'] || !$result['valid']))
                         {
                             // redisplay the current group
@@ -5203,8 +5203,8 @@
                 $sdata = array_filter($sdata);
                 SurveyDynamic::sid($this->sid);
                 $oSurvey = new SurveyDynamic;
-
-                $iNewID = $oSurvey->insertRecords($sdata);
+                
+                $iNewID = $oSurvey->insertRecords($sdata); 
                 if ($iNewID)    // Checked
                 {
                     $srid = $iNewID;
@@ -5214,13 +5214,13 @@
                 {
                     $message .= $this->gT("Unable to insert record into survey table"); // TODO - add SQL error?
                     echo submitfailed('');  // TODO - report SQL error?
-
+                    
                 }
                 //Insert Row for Timings, if needed
                 if ($this->surveyOptions['savetimings']) {
                     SurveyTimingDynamic::sid($this->sid);
                     $oSurveyTimings = new SurveyTimingDynamic;
-
+                    
                     $tdata = array(
                     'id'=>$srid,
                     'interviewtime'=>0
@@ -7866,14 +7866,14 @@ EOT;
     <script type='text/javascript'>
     <!--
     var LEMradix='.';
-    function checkconditions(value, name, type, evt_type)
-    {
+	function checkconditions(value, name, type, evt_type)
+	{
         if (typeof evt_type === 'undefined')
         {
             evt_type = 'onchange';
         }
         ExprMgr_process_relevance_and_tailoring(evt_type,name,type);
-    }
+	}
     // -->
     </script>
 EOD;
@@ -8012,26 +8012,27 @@ EOD;
         private static function getConditionsForEM($surveyid=NULL, $qid=NULL)
         {
             if (!is_null($qid)) {
-                $where = " c.qid = ".$qid." AND ";
+                $where = " c.qid = ".$qid." and ";
             }
             else if (!is_null($surveyid)) {
-                    $where = " qa.sid = {$surveyid} AND ";
+                    $where = " c.qid in (select qid from {{questions}} where sid = ".$surveyid.") and ";
                 }
                 else {
                     $where = "";
             }
 
-            $query = "SELECT DISTINCT c.*, q.sid, q.type
-                FROM {{conditions}} AS c
-                LEFT JOIN {{questions}} q ON c.cqid=q.qid
-                LEFT JOIN {{questions}} qa ON c.qid=qa.qid
-                WHERE {$where} 1=1
-                UNION
-                SELECT DISTINCT c.*, q.sid, '' AS TYPE
-                FROM {{conditions}} AS c
-                LEFT JOIN {{questions}} q ON c.cqid=q.qid
-                LEFT JOIN {{questions}} qa ON c.qid=qa.qid
-                WHERE {$where} c.cqid = 0";
+            $query = "select distinct c.*"
+            .", q.sid, q.type"
+            ." from {{conditions}} as c"
+            .", {{questions}} as q"
+            ." where " . $where
+            ." c.cqid=q.qid"
+            ." union "
+            ." select c.*, q.sid, '' as type"
+            ." from {{conditions}} as c"
+            .", {{questions}} as q"
+            ." where ". $where
+            ." c.cqid = 0 and c.qid = q.qid";
 
             $databasetype = Yii::app()->db->getDriverName();
             if ($databasetype=='mssql' || $databasetype=='dblib')
@@ -8043,60 +8044,71 @@ EOD;
                 $query .= " order by sid, qid, scenario, cqid, cfieldname, value";
             }
 
-            return Yii::app()->db->createCommand($query)->query();
+            $data = dbExecuteAssoc($query);
+
+            return $data;
         }
 
         /**
         * Deprecate obsolete question attributes.
         * @param boolean $changedb - if true, updates parameters and deletes old ones
-        * @param type $iSureyID - if set, then only for that survey
+        * @param type $surveyid - if set, then only for that survey
         * @param type $onlythisqid - if set, then only for this question ID
         */
-        public static function UpgradeQuestionAttributes($changeDB=false,$iSurveyID=NULL,$onlythisqid=NULL)
+        public static function UpgradeQuestionAttributes($changeDB=false,$surveyid=NULL,$onlythisqid=NULL)
         {
             $LEM =& LimeExpressionManager::singleton();
-            if (is_null($iSurveyID))
-            {
-                $sQuery='SELECT sid FROM {{surveys}}';
-                $aSurveyIDs = Yii::app()->db->createCommand($sQuery)->queryColumn();
-            }
-            else{
-                $aSurveyIDs=array($iSurveyID);
-            }
+            $qattrs = $LEM->getQuestionAttributesForEM($surveyid,$onlythisqid,$_SESSION['LEMlang']);
+
+            $qupdates = array();
 
             $attibutemap = array(
-                'max_num_value_sgqa' => 'max_num_value',
-                'min_num_value_sgqa' => 'min_num_value',
-                'num_value_equals_sgqa' => 'equals_num_value',
+            'max_num_value_sgqa' => 'max_num_value',
+            'min_num_value_sgqa' => 'min_num_value',
+            'num_value_equals_sgqa' => 'equals_num_value',
             );
             $reverseAttributeMap = array_flip($attibutemap);
-            foreach ($aSurveyIDs as $iSurveyID)
-            {
-                $qattrs = $LEM->getQuestionAttributesForEM($iSurveyID,$onlythisqid,$_SESSION['LEMlang']);
-                foreach ($qattrs as $qid => $qattr)
-                {
-                    $updates = array();
-                    foreach ($attibutemap as $src=>$target)
-                    {
-                        if (isset($qattr[$src]) && trim($qattr[$src]) != '')
-                        {
-                            $updates[$target] = $qattr[$src];
-                        }
-                    }
-                    if ($changeDB)
-                    {
-                        foreach  ($updates as $key=>$value)
-                        {
-                            $query = "UPDATE {{question_attributes}} SET value=".Yii::app()->db->quoteValue($value)." WHERE qid={$qid} and attribute=".Yii::app()->db->quoteValue($key);
-                            Yii::app()->db->createCommand($query)->execute();
-                            $query = "DELETE FROM {{question_attributes}} WHERE qid={$qid} and attribute=".Yii::app()->db->quoteValue($reverseAttributeMap[$key]);
-                            Yii::app()->db->createCommand($query)->execute();
 
-                        }
+            foreach ($qattrs as $qid => $qattr)
+            {
+                $updates = array();
+                foreach ($attibutemap as $src=>$target)
+                {
+                    if (isset($qattr[$src]) && trim($qattr[$src]) != '')
+                    {
+                        $updates[$target] = $qattr[$src];
                     }
                 }
+                if (count($updates) > 0)
+                {
+                    $qupdates[$qid] = $updates;
+                }
             }
+            if ($changeDB)
+            {
+                $queries = array();
+                foreach ($qupdates as $qid=>$updates)
+                {
+                    foreach  ($updates as $key=>$value)
+                    {
+                        $query = "UPDATE {{question_attributes}} SET value=".Yii::app()->db->quoteValue($value)." WHERE qid=".$qid." and attribute=".Yii::app()->db->quoteValue($key);
+                        $queries[] = $query;
+                        $query = "DELETE FROM {{question_attributes}} WHERE qid=".$qid." and attribute=".Yii::app()->db->quoteValue($reverseAttributeMap[$key]);
+                        $queries[] = $query;
 
+                    }
+                }
+                // now update the datbase
+                foreach ($queries as $query)
+                {
+                    dbExecuteAssoc($query);
+                }
+                return $queries;
+            }
+            else
+            {
+                return $qupdates;
+            }
         }
 
         /**
@@ -9891,7 +9903,7 @@ EOD;
             $token = Token::model($iSurveyId)->findByAttributes(array(
                 'token' => $sToken
             ));
-
+            
             $this->knownVars['TOKEN:TOKEN'] = array(
                 'code'=> $sToken,
                 'jsName_on'=>'',

@@ -153,15 +153,12 @@ class update extends Survey_Common_Action
         $updatebuild = getGlobalSetting("updatebuild");
         list($error, $updateinfo, $cookies) = $this->_getChangedFiles($buildnumber, $updatebuild);
         $aData = $this->_getFileStatus($updateinfo);
-        if(count($aData['readonlyfiles']))
+        foreach (array_unique($aData['readonlyfiles']) as $aFile)
         {
-            foreach (array_unique($aData['readonlyfiles']) as $aFile)
-            {
-                $aReadOnlyFiles[]=substr($aFile,strlen(Yii::app()->getConfig("rootdir")));
-            }
-            sort($aReadOnlyFiles);
-            $aData['readonlyfiles']=$aReadOnlyFiles;
-        }
+            $aReadOnlyFiles[]=substr($aFile,strlen(Yii::app()->getConfig("rootdir")));  
+        };
+        sort($aReadOnlyFiles);
+        $aData['readonlyfiles']=$aReadOnlyFiles;
         Yii::app()->session['updateinfo'] = $updateinfo;
         Yii::app()->session['updatesession'] = $cookies;
 

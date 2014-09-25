@@ -237,15 +237,23 @@ class CheckIntegrity extends Survey_Common_Action
 
     private function _deleteQuotaMembers(array $aData, Limesurvey_lang $clang)
     {
-        $oCriteria = new CDbCriteria;
-        $oCriteria->join = 'LEFT JOIN {{questions}} q ON t.qid=q.qid LEFT JOIN {{surveys}} s ON t.sid=s.sid';
-        $oCriteria->condition = '(q.qid IS NULL) OR (s.sid IS NULL)';
+        $quota_ids = array();
+        $quotas = Quota::model()->findAll();
+        foreach ($quotas as $quota) $quota_ids[] = $quota['id'];
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('quota_id', $quota_ids);
 
-        $aRecords=QuotaMember::model()->findAll($oCriteria);
-        foreach ($aRecords as $aRecord)
-        {
-            QuotaMember::model()->deleteAllByAttributes($aRecord);
-        }
+        $qids = array();
+        $questions = Question::model()->findAll();
+        foreach ($questions as $question) $qids[] = $question['qid'];
+        $criteria->addNotInCondition('qid', $qids, 'OR');
+
+        $sids = array();
+        $surveys = Survey::model()->findAll();
+        foreach ($surveys as $survey) $sids[] = $survey['sid'];
+        $criteria->addNotInCondition('sid', $sids, 'OR');
+
+        QuotaMember::model()->deleteAll($criteria);
         if (QuotaLanguageSetting::model()->hasErrors()) safeDie(QuotaLanguageSetting::model()->getError());
         $aData['messages'][] = $clang->gT('Deleting orphaned quota members.');
         return $aData;
@@ -278,15 +286,14 @@ class CheckIntegrity extends Survey_Common_Action
 
     private function _deleteDefaultValues(array $aData, Limesurvey_lang $clang)
     {
+        $qids = array();
+        $questions = Question::model()->findAll();
+        foreach ($questions as $question) $qids[] = $question['qid'];
         $criteria = new CDbCriteria;
-        $criteria->join = 'LEFT JOIN {{questions}} q ON t.qid=q.qid';
-        $criteria->condition = 'q.qid IS NULL';
+        $criteria->addNotInCondition('qid', $qids);
 
-        $aRecords=DefaultValue::model()->findAll($criteria);
-        foreach ($aRecords as $aRecord)
-        {
-            DefaultValue::model()->deleteAllByAttributes($aRecord);
-        }
+        DefaultValue::model()->deleteAll($criteria);
+        if (DefaultValue::model()->hasErrors()) safeDie(DefaultValue::model()->getError());
         $aData['messages'][] = $clang->gT('Deleting orphaned default values.');
         return $aData;
     }
@@ -329,37 +336,36 @@ class CheckIntegrity extends Survey_Common_Action
         $users = User::model()->findAll();
         $uids = array();
         foreach ($users as $user) $uids[] = $user['uid'];
-        $oCriteria = new CDbCriteria;
-        $oCriteria->addNotInCondition('uid', $uids, 'OR');
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('uid', $uids, 'OR');
 
         $surveys = Survey::model()->findAll();
         $sids = array();
         foreach ($surveys as $survey) $sids[] = $survey['sid'];
-        $oCriteria->addNotInCondition('entity_id', $sids, 'OR');
-        $oCriteria->addCondition("entity='survey'");
+        $criteria->addNotInCondition('entity_id', $sids, 'OR');
+        $criteria->addCondition("entity='survey'");
 
-        Permission::model()->deleteAll($oCriteria);
-
+        Permission::model()->deleteAll($criteria);
+        
 
         // Deactivate surveys that have a missing response table
-        foreach ($surveys as $survey)
+        foreach ($surveys as $survey) 
         {
             if ($survey['active']=='Y' && !tableExists("{{survey_{$survey['sid']}}}"))
             {
                 Survey::model()->updateByPk($survey['sid'],array('active'=>'N'));
             }
         }
-        unset($surveys);
-
-
-
+        
+        
+        
         // Fix subquestions
         fixSubquestions();
 
         /*** Check for active survey tables with missing survey entry and rename them ***/
         $sDBPrefix = Yii::app()->db->tablePrefix;
         $sQuery = dbSelectTablesLike('{{survey}}\_%');
-        $aResult = dbQueryOrFalse($sQuery);
+        $aResult = dbQueryOrFalse($sQuery) or safeDie("Couldn't get list of conditions from database<br />{$sQuery}<br />");
         foreach ($aResult->readAll() as $aRow)
         {
             $sTableName = substr(reset($aRow), strlen($sDBPrefix));
@@ -382,7 +388,7 @@ class CheckIntegrity extends Survey_Common_Action
         }
 
         /*** Check for active token tables with missing survey entry ***/
-        $aResult = dbQueryOrFalse(dbSelectTablesLike('{{tokens}}\_%'));
+        $aResult = dbQueryOrFalse(dbSelectTablesLike('{{tokens}}\_%')) or safeDie("Couldn't get list of conditions from database<br />{$sQuery}<br />");
         foreach ($aResult->readAll() as $aRow)
         {
             $sTableName = substr(reset($aRow), strlen($sDBPrefix));
@@ -402,15 +408,16 @@ class CheckIntegrity extends Survey_Common_Action
         /**********************************************************************/
         /*     Check conditions                                               */
         /**********************************************************************/
+        // TMSW Condition->Relevance:  Replace this with analysis of relevance
+        $conditions = Condition::model()->findAll();
+        if (Condition::model()->hasErrors()) safeDie(Condition::model()->getError());
         $okQuestion = array();
-        $sQuery = 'SELECT cqid,cid,cfieldname FROM {{conditions}}';
-        $aConditions = Yii::app()->db->createCommand($sQuery)->queryAll();
-        foreach ($aConditions as $condition)
+        foreach ($conditions as $condition)
         {
             if ($condition['cqid'] != 0) { // skip case with cqid=0 for codnitions on {TOKEN:EMAIL} for instance
                 if (!array_key_exists($condition['cqid'], $okQuestion)) {
                     $iRowCount = Question::model()->countByAttributes(array('qid' => $condition['cqid']));
-                    if (Question::model()->hasErrors()) safeDie(Question::model()->getError());
+                    if (Question::model()->hasErrors()) safeDie(Question::model()->getError());                
                     if (!$iRowCount) {
                         $aDelete['conditions'][] = array('cid' => $condition['cid'], 'reason' => $clang->gT('No matching CQID'));
                     } else {
@@ -432,8 +439,7 @@ class CheckIntegrity extends Survey_Common_Action
                 $aDelete['conditions'][] = array('cid' => $condition['cid'], 'reason' => $clang->gT('No CFIELDNAME field set!') . " ({$condition['cfieldname']})");
             }
         }
-        unset($okQuestion);
-        unset($aConditions);
+
         /**********************************************************************/
         /*     Check question attributes                                      */
         /**********************************************************************/
@@ -448,11 +454,14 @@ class CheckIntegrity extends Survey_Common_Action
         /**********************************************************************/
         /*     Check default values                                           */
         /**********************************************************************/
-        $oCriteria = new CDbCriteria;
-        $oCriteria->join = 'LEFT JOIN {{questions}} q ON t.qid=q.qid';
-        $oCriteria->condition = 'q.qid IS NULL';
-        $aRecords=DefaultValue::model()->findAll($oCriteria);
-        $aDelete['defaultvalues'] = count($aRecords);
+        $questions = Question::model()->findAll();
+        if (Question::model()->hasErrors()) safeDie(Question::model()->getError());
+        $qids = array();
+        foreach ($questions as $question) $qids[] = $question['qid'];
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('qid', $qids);
+
+        $aDelete['defaultvalues'] = count(DefaultValue::model()->findAll($criteria));
         if (DefaultValue::model()->hasErrors()) safeDie(DefaultValue::model()->getError());
 
         /**********************************************************************/
@@ -462,10 +471,10 @@ class CheckIntegrity extends Survey_Common_Action
         if (Survey::model()->hasErrors()) safeDie(Survey::model()->getError());
         $sids = array();
         foreach ($surveys as $survey) $sids[] = $survey['sid'];
-        $oCriteria = new CDbCriteria;
-        $oCriteria->addNotInCondition('sid', $sids);
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('sid', $sids);
 
-        $aDelete['quotas'] = count(Quota::model()->findAll($oCriteria));
+        $aDelete['quotas'] = count(Quota::model()->findAll($criteria));
         if (Quota::model()->hasErrors()) safeDie(Quota::model()->getError());
 
         /**********************************************************************/
@@ -475,28 +484,40 @@ class CheckIntegrity extends Survey_Common_Action
         if (Quota::model()->hasErrors()) safeDie(Quota::model()->getError());
         $ids = array();
         foreach ($quotas as $quota) $ids[] = $quota['id'];
-        $oCriteria = new CDbCriteria;
-        $oCriteria->addNotInCondition('quotals_quota_id', $ids);
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('quotals_quota_id', $ids);
 
-        $aDelete['quotals'] = count(QuotaLanguageSetting::model()->findAll($oCriteria));
+        $aDelete['quotals'] = count(QuotaLanguageSetting::model()->findAll($criteria));
         if (QuotaLanguageSetting::model()->hasErrors()) safeDie(QuotaLanguageSetting::model()->getError());
 
         /**********************************************************************/
         /*     Check quota members                                   */
         /**********************************************************************/
-        $oCriteria = new CDbCriteria;
-        $oCriteria->join = 'LEFT JOIN {{questions}} q ON t.qid=q.qid LEFT JOIN {{surveys}} s ON t.sid=s.sid';
-        $oCriteria->condition = '(q.qid IS NULL) OR (s.sid IS NULL)';
+        $quotas = Quota::model()->findAll();
+        $quota_ids = array();
+        foreach ($quotas as $quota) $quota_ids[] = $quota['id'];
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('quota_id', $quota_ids);
 
-        $aDelete['quotamembers'] = count(QuotaMember::model()->findAll($oCriteria));
+        $questions = Question::model()->findAll();
+        $qids = array();
+        foreach ($questions as $question) $qids[] = $question['qid'];
+        $criteria->addNotInCondition('qid', $qids, 'OR');
+
+        $surveys = Survey::model()->findAll();
+        $sids = array();
+        foreach ($surveys as $survey) $sids[] = $survey['sid'];
+        $criteria->addNotInCondition('sid', $sids, 'OR');
+
+        $aDelete['quotamembers'] = count(QuotaMember::model()->findAll($criteria));
         if (QuotaMember::model()->hasErrors()) safeDie(QuotaMember::model()->getError());
 
         /**********************************************************************/
         /*     Check assessments                                              */
         /**********************************************************************/
-        $oCriteria = new CDbCriteria;
-        $oCriteria->compare('scope', 'T');
-        $assessments = Assessment::model()->findAll($oCriteria);
+        $criteria = new CDbCriteria;
+        $criteria->compare('scope', 'T');
+        $assessments = Assessment::model()->findAll($criteria);
         if (Assessment::model()->hasErrors()) safeDie(Assessment::model()->getError());
         foreach ($assessments as $assessment)
         {
@@ -507,9 +528,9 @@ class CheckIntegrity extends Survey_Common_Action
             }
         }
 
-        $oCriteria = new CDbCriteria;
-        $oCriteria->compare('scope', 'G');
-        $assessments = Assessment::model()->findAll($oCriteria);
+        $criteria = new CDbCriteria;
+        $criteria->compare('scope', 'G');
+        $assessments = Assessment::model()->findAll($criteria);
         if (Assessment::model()->hasErrors()) safeDie(Assessment::model()->getError());
         foreach ($assessments as $assessment)
         {
@@ -519,19 +540,25 @@ class CheckIntegrity extends Survey_Common_Action
                 $aDelete['assessments'][] = array('id' => $assessment['id'], 'assessment' => $assessment['name'], 'reason' => $clang->gT('No matching group'));
             }
         }
-        unset($assessments);
         /**********************************************************************/
         /*     Check answers                                                  */
         /**********************************************************************/
-        $oCriteria = new CDbCriteria;
-        $oCriteria->join = 'LEFT JOIN {{questions}} q ON t.qid=q.qid';
-        $oCriteria->condition = '(q.qid IS NULL)';
-
-        $answers = Answer::model()->findAll($oCriteria);
+        $answers = Answer::model()->findAll();
+        if (Answer::model()->hasErrors()) safeDie(Answer::model()->getError());
+        $okQuestion = array();
         foreach ($answers as $answer)
         {
-            $aDelete['answers'][] = array('qid' => $answer['qid'], 'code' => $answer['code'], 'reason' => $clang->gT('No matching question'));
+            if (!array_key_exists($answer['qid'], $okQuestion)) {
+                $iAnswerCount = Question::model()->countByAttributes(array('qid' => $answer['qid']));
+                if (Question::model()->hasErrors()) safeDie(Question::model()->getError());
+                if (!$iAnswerCount) {
+                    $aDelete['answers'][] = array('qid' => $answer['qid'], 'code' => $answer['code'], 'reason' => $clang->gT('No matching question'));
+                }  else {
+                    $okQuestion[$answer['qid']] = $answer['qid'];
+                }
+            }
         }
+
         /***************************************************************************/
         /*   Check survey languagesettings and restore them if they don't exist    */
         /***************************************************************************/
@@ -563,7 +590,7 @@ class CheckIntegrity extends Survey_Common_Action
                 }
             }
         }
-
+        
 
         /**********************************************************************/
         /*     Check survey language settings                                 */
@@ -572,9 +599,9 @@ class CheckIntegrity extends Survey_Common_Action
         if (Survey::model()->hasErrors()) safeDie(Survey::model()->getError());
         $sids = array();
         foreach ($surveys as $survey) $sids[] = $survey['sid'];
-        $oCriteria = new CDbCriteria;
-        $oCriteria->addNotInCondition('surveyls_survey_id', $sids);
-        $surveys_languagesettings = SurveyLanguageSetting::model()->findAll($oCriteria);
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('surveyls_survey_id', $sids);
+        $surveys_languagesettings = SurveyLanguageSetting::model()->findAll($criteria);
         if (SurveyLanguageSetting::model()->hasErrors()) safeDie(SurveyLanguageSetting::model()->getError());
 
         foreach ($surveys_languagesettings as $surveys_languagesetting)
@@ -585,14 +612,23 @@ class CheckIntegrity extends Survey_Common_Action
         /**********************************************************************/
         /*     Check questions                                                */
         /**********************************************************************/
-        $oCriteria = new CDbCriteria;
-        $oCriteria->join = 'LEFT JOIN {{surveys}} s ON t.sid=s.sid LEFT JOIN {{groups}} g ON t.gid=g.gid';
-        $oCriteria->condition = '(g.gid IS NULL) OR (s.sid IS NULL)';
-        $questions = Question::model()->findAll($oCriteria);
+        $questions = Question::model()->findAll();
         if (Question::model()->hasErrors()) safeDie(Question::model()->getError());
+        $groups = QuestionGroup::model()->findAll();
+        if (QuestionGroup::model()->hasErrors()) safeDie(QuestionGroup::model()->getError());
+        $gids = array();
+        foreach ($groups as $group) $gids[] = $group['gid'];
+        
         foreach ($questions as $question)
         {
-            $aDelete['questions'][] = array('qid' => $question['qid'], 'reason' => $clang->gT('No matching group') . " ({$question['gid']})");
+            //Make sure the group exists
+            if (!in_array($question['gid'], $gids)) {
+                $aDelete['questions'][] = array('qid' => $question['qid'], 'reason' => $clang->gT('No matching group') . " ({$question['gid']})");
+            }
+            //Make sure survey exists
+            if (!in_array($question['sid'], $sids)) {
+                $aDelete['questions'][] = array('qid' => $question['qid'], 'reason' => $clang->gT('There is no matching survey.') . " ({$question['sid']})");
+            }
         }
 
         /**********************************************************************/
@@ -602,9 +638,9 @@ class CheckIntegrity extends Survey_Common_Action
         if (Survey::model()->hasErrors()) safeDie(Survey::model()->getError());
         $sids = array();
         foreach ($surveys as $survey) $sids[] = $survey['sid'];
-        $oCriteria = new CDbCriteria;
-        $oCriteria->addNotInCondition('sid', $sids);
-        $groups = QuestionGroup::model()->findAll($oCriteria);
+        $criteria = new CDbCriteria;
+        $criteria->addNotInCondition('sid', $sids);
+        $groups = QuestionGroup::model()->findAll($criteria);
         foreach ($groups as $group)
         {
             $aDelete['groups'][] = array('gid' => $group['gid'], 'reason' => $clang->gT('There is no matching survey.') . ' SID:' . $group['sid']);
@@ -617,12 +653,14 @@ class CheckIntegrity extends Survey_Common_Action
         //2: Check if that survey id still exists
         //3: If it doesn't offer it for deletion
         $sQuery = dbSelectTablesLike('{{old_survey}}%');
-        $aTables = Yii::app()->db->createCommand($sQuery)->queryColumn();
+        $aResult = dbQueryOrFalse($sQuery) or safeDie("Couldn't get list of conditions from database<br />$sQuery<br />");
+        $aTables = $aResult->readAll();
 
         $aOldSIDs = array();
         $aSIDs = array();
         foreach ($aTables as $sTable)
         {
+            $sTable = reset($sTable);
             list($sOldText, $SurveyText, $iSurveyID, $sDate) = explode('_', substr($sTable, strlen($sDBPrefix)));
             $aOldSIDs[] = $iSurveyID;
             $aFullOldSIDs[$iSurveyID][] = $sTable;
@@ -686,8 +724,8 @@ class CheckIntegrity extends Survey_Common_Action
         //1: Get list of 'old_token' tables and extract the survey id
         //2: Check if that survey id still exists
         //3: If it doesn't offer it for deletion
-        $sQuery = dbSelectTablesLike('{{old_token}}%');
-        $aTables = Yii::app()->db->createCommand($sQuery)->queryColumn();
+        $aResult = dbQueryOrFalse(dbSelectTablesLike('{{old_token}}%')) or safeDie("Couldn't get list of conditions from database<br />$sQuery<br />");
+        $aTables = $aResult->readAll();
 
         $aOldTokenSIDs = array();
         $aTokenSIDs = array();
@@ -695,6 +733,8 @@ class CheckIntegrity extends Survey_Common_Action
 
         foreach ($aTables as $sTable)
         {
+            $sTable = reset($sTable);
+
             list($sOldText, $SurveyText, $iSurveyID, $sDateTime) = explode('_', substr($sTable, strlen($sDBPrefix)));
             $aTokenSIDs[] = $iSurveyID;
             $aFullOldTokenSIDs[$iSurveyID][] = $sTable;

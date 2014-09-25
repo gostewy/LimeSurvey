@@ -776,14 +776,18 @@ function CSVImportGroup($sFullFilePath, $iNewSID)
 */
 function XMLImportGroup($sFullFilePath, $iNewSID)
 {
+    echo " hi teri -1 ";
     $clang = Yii::app()->lang;
 
+    echo " hi teri 0 ";
     $aLanguagesSupported = array();  // this array will keep all the languages supported for the survey
 
     $sBaseLanguage = Survey::model()->findByPk($iNewSID)->language;
+    echo " hi teri 1 ";
     $aLanguagesSupported[]=$sBaseLanguage;     // adds the base language to the list of supported languages
     $aLanguagesSupported=array_merge($aLanguagesSupported,Survey::model()->findByPk($iNewSID)->additionalLanguages);
     $sXMLdata = file_get_contents($sFullFilePath);
+    echo " hi teri 2 ";
     $xml = simplexml_load_string($sXMLdata,'SimpleXMLElement',LIBXML_NONET);
     if ($xml==false || $xml->LimeSurveyDocType!='Group') safeDie('This is not a valid LimeSurvey group structure XML file.');
     $iDBVersion = (int) $xml->DBVersion;

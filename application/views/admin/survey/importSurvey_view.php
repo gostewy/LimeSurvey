@@ -3,16 +3,7 @@
     <?php
         if ($bFailed){ ?>
         <div class='errorheader'><?php $clang->eT("Error");?></div>
-        <?php
-        if(is_string($sErrorMessage)) {    
-            echo $sErrorMessage; 
-        } else if(is_array($sErrorMessage)) {
-            echo '<!-- an array --><ul><li>' , implode('</li><li>', $sErrorMessage) , '</li></ul>';
-        } else { 
-            //false???? seems to be working!
-            //var_dump($sErrorMessage);
-        }
-        ?><br /><br />
+        <?php echo $sErrorMessage; ?><br /><br />
 		<input type='submit' value='<?php $clang->eT("Main Admin Screen");?>' onclick="window.open('<?php echo $this->createUrl('/admin');?>', '_top')"> 
         <input type='submit' value='<?php $clang->eT("Import again");?>' onclick="window.open('<?php echo $this->createUrl('admin/survey/sa/newsurvey#import');?>', '_top')"><br /><br /></div>
     <?php } else

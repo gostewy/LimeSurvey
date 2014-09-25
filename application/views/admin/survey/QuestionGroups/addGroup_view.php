@@ -61,6 +61,22 @@
                 <input type='hidden' name='sid' value='<?php echo $surveyid; ?>' />
             </form>
 
+
+
+                    <?php echo CHtml::form(array("admin/questiongroups/sa/import"), 'post', array('id'=>'importfolder', 'name'=>'importfolder', 'class'=>'form30',
+                        'enctype'=>'multipart/form-data', 'onsubmit'=>'return true;')); ?>
+            <ul>
+                <li>
+                    <label for='the_folder'><?php $clang->eT("Folder:"); ?></label>
+                    <input id='the_folder' name="the_folder" type="text" /></li>
+                <li><label for='translinksfields'><?php $clang->eT("Convert resource links?"); ?></label>
+                    <input id='translinksfields' name="translinksfields" type="checkbox" checked="checked"/></li></ul>
+            <p><input type='submit' value='<?php $clang->eT("Import question groups"); ?>' />
+                <input type='hidden' name='action' value='importfolder' />
+                <input type='hidden' name='sid' value='<?php echo $surveyid; ?>' />
+                </form>
+
+
         </div>
         <?php } ?>
 

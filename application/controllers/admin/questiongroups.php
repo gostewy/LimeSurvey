@@ -91,6 +91,47 @@ class questiongroups extends Survey_Common_Action
 
             $this->_renderWrappedTemplate('survey/QuestionGroups', 'import_view', $aData);
             // TMSW Condition->Relevance:  call LEM->ConvertConditionsToRelevance() after import
+
+        } else if($action == 'importfolder'){
+            //c:\inetpub\www2dev\city\LimeSurvey\tmp\teri
+            if(is_dir($_POST['the_folder'])) {
+                $dir = $_POST['the_folder'];
+                echo " ht valid folder ";
+                //no ..
+                $files = array_diff(scandir($dir), array('.', '..'));
+                //var_dump($files);
+
+                //assuming this will be bad
+                if (!returnGlobal('sid'))
+                    $fatalerror = $clang->gT("No SID (Survey) has been provided. Cannot import question.");
+
+                if (isset($fatalerror))
+                {
+                    $this->getController()->error($fatalerror);
+                }
+
+                //you need the importer
+                Yii::app()->loadHelper('admin/import');
+                foreach($files as $fileToImport) {
+                    $fileToImport = $dir . DIRECTORY_SEPARATOR  . $fileToImport;
+                    echo " hi teri $fileToImport $surveyid <br>";
+                    $aImportResults = XMLImportGroup($fileToImport, $surveyid);
+                    if (isset($aImportResults['fatalerror']))
+                    {
+                        var_dump($aImportResults);
+                    }
+                }
+                LimeExpressionManager::SetDirtyFlag(); // so refreshes syntax highlighting
+                fixLanguageConsistency($surveyid);
+
+                echo " ht DONE ";
+            } else {
+                echo " ht bad folder ";
+            }
+            var_dump($_POST);
+
+            echo " hi teri  ";
+            exit;
         }
     }
 

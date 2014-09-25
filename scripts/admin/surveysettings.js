@@ -1,12 +1,6 @@
 // $Id: surveysettings.js 9757 2011-02-09 20:52:33Z c_schmitz $
-$(document).on('click',"[data-copy] :submit",function(){
-    $("form :input[value='"+$(this).val()+"']").click();
-});
-$(document).ready(function(){
 
-    $("[data-copy]").each(function(){
-        $(this).html($("#"+$(this).data('copy')).html());
-    });
+$(document).ready(function(){
     $("#template").change(templatechange);
     $("#template").keyup(templatechange);
     $("#copysurveyform").submit(copysurvey);
